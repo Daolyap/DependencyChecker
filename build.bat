@@ -1,0 +1,1 @@
+pyinstaller --onefile --clean --name AssureDepentity --icon=assets/the.ico --uac-admin AssureDependence.py && rmdir /s /q build && del AssureDepentity.spec

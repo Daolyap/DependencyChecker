@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assure Technical Dependency Dashboard</title>
+    <!-- ADDED LIBRARIES FOR PDF EXPORT -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1f2027 0%, #3a3c58 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header, .card {
+            background: rgba(42, 42, 56, 0.75);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(102, 104, 173, 0.2);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .header h1 {
+            font-size: 2.5rem; font-weight: 700;
+            background: linear-gradient(135deg, #9395d3, #6668ad);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .header p { font-size: 1.1rem; color: #b0b0b0; margin-bottom: 20px; }
+        .scan-info { display: flex; gap: 20px; flex-wrap: wrap; }
+        .scan-stat {
+            background: rgba(53, 53, 72, 0.8); padding: 15px 20px;
+            border-radius: 12px; border-left: 4px solid #6668ad;
+        }
+        .scan-stat strong { display: block; font-size: 1.5rem; color: #ffffff; }
+        .scan-stat span { color: #b0b0b0; font-size: 0.9rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; margin-bottom: 30px; }
+        .card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); }
+        .card h2 { font-size: 1.5rem; margin-bottom: 20px; color: #f0f0f0; display: flex; align-items: center; gap: 10px; }
+        .app-dependency {
+            padding: 15px; margin: 10px 0; background: #353548;
+            border-radius: 8px; border-left: 4px solid #6668ad; transition: all 0.3s ease;
+        }
+        .app-dependency:hover { transform: translateX(3px); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
+        .app-dependency.eol { border-left-color: #e74c3c; background: linear-gradient(90deg, rgba(231, 76, 60, 0.15) 0%, #353548 100%); }
+        .app-dependency.running { border-left-color: #f39c12; background: linear-gradient(90deg, rgba(243, 156, 18, 0.15) 0%, #353548 100%); }
+        .app-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .app-name { font-weight: 600; color: #f5f5f5; font-size: 1.2rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #4a4a6a; }
+        .app-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem; color: #b0b0b0; }
+        .app-detail-item { word-break: break-word; }
+        .app-detail-item.full-row { grid-column: 1 / -1; margin-top: 5px; }
+        .app-path { font-family: 'Courier New', monospace; background: #1e1e28; padding: 4px 8px; border-radius: 4px; color: #d0d0d0; word-break: break-all; }
+        .confidence-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
+        .confidence-high { background: #155724; color: #d4edda; }
+        .confidence-medium { background: #856404; color: #fff3cd; }
+        .confidence-low { background: #721c24; color: #f8d7da; }
+        .running-indicator { background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+        .running-indicator::before { content: "●"; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .dependency-framework { font-weight: 600; color: #9395d3; }
+        .dependency-framework.eol { color: #ff7675; }
+        .framework-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #4a4a6a; }
+        .framework-item:last-child { border-bottom: none; }
+        .framework-info h4 { margin-bottom: 5px; color: #f0f0f0; }
+        .framework-info p { color: #b0b0b0; font-size: 0.9rem; }
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+        .status-eol { background: #e74c3c; color: white; }
+        .status-supported { background: #27ae60; color: white; }
+        .status-unknown { background: #5f6769; color: white; }
+        .chart-container { position: relative; height: 300px; margin: 20px 0; }
+        .full-width-card { grid-column: 1 / -1; }
+        .file-upload { margin: 20px 0; text-align: center; }
+        .upload-area {
+            border: 2px dashed #6668ad; border-radius: 12px; padding: 30px;
+            background: rgba(102, 104, 173, 0.1); cursor: pointer; transition: all 0.3s ease;
+        }
+        .upload-area:hover, .upload-area.dragover { background: rgba(102, 104, 173, 0.2); border-color: #9395d3; }
+        .upload-area h3 { color: #f0f0f0; }
+        .upload-area p { color: #b0b0b0; }
+        #fileInput { display: none; }
+        .loading { display: none; text-align: center; padding: 40px; }
+        .spinner {
+            border: 4px solid #444; border-top: 4px solid #6668ad; border-radius: 50%;
+            width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .export-buttons { display: flex; gap: 15px; margin: 20px 0; justify-content: center; }
+        .btn {
+            background: linear-gradient(135deg, #6668ad, #8e90d1); color: white; border: none; padding: 12px 24px;
+            border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 104, 173, 0.2); }
+        .btn-secondary { background: linear-gradient(135deg, #555994, #444675); }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+            .scan-info, .export-buttons { flex-direction: column; }
+            .header h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- The ID "reportContainer" wraps everything that will be included in the PDF -->
+        <div id="reportContainer">
+            <div class="header">
+                <h1>💻 Assure Technical Application Dependency Dashboard</h1>
+                <p>An overview of installed frameworks and their application dependencies</p>
+                
+                <div class="file-upload" id="fileUploadContainer">
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()" 
+                         ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                        <h3>📁 Load Dependency Report</h3>
+                        <p>Click here or drag and drop your dependency_report.json file</p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".json" onchange="handleFileSelect(event)">
+                </div>
+
+                <div class="loading" id="loading"><div class="spinner"></div><p>Loading report...</p></div>
+                
+                <div id="dashboardContent" style="display: none;">
+                    <div class="scan-info" id="scanInfo">
+                        <div class="scan-stat"><strong id="frameworkCount">0</strong><span>Frameworks Found</span></div>
+                        <div class="scan-stat"><strong id="dependencyCount">0</strong><span>Dependencies</span></div>
+                        <div class="scan-stat"><strong id="scanDate">-</strong><span>Last Scan</span></div>
+                    </div>
+                    <div class="export-buttons" id="exportButtons">
+                        <button id="exportPdfBtn" class="btn" onclick="exportToPDF()">📄 Export PDF Report</button>
+                        <button class="btn btn-secondary" onclick="exportToCSV()">📊 Export CSV Data</button>
+                    </div>
+                </div>
+            </div>
+            <div id="dashboardGrid" style="display: none;">
+                <div class="grid">
+                    <div class="card full-width-card">
+                        <h2>💻 Application Dependencies</h2>
+                        <div id="applicationDependencies"></div>
+                    </div>
+                    <div class="card">
+                        <h2>📊 Framework Distribution</h2>
+                        <div class="chart-container"><canvas id="frameworkChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <h2>🏗️ Installed Frameworks</h2>
+                        <div id="frameworkList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let reportData = null; 
+        let frameworkChart = null;
+        Chart.defaults.color = '#ccc'; 
+        Chart.defaults.borderColor = '#444';
+
+        function handleFileSelect(event) { if (event.target.files[0]) loadReportFile(event.target.files[0]); }
+        function handleDrop(event) { event.preventDefault(); event.stopPropagation(); event.target.closest('.upload-area').classList.remove('dragover'); if (event.dataTransfer.files.length > 0) loadReportFile(event.dataTransfer.files[0]); }
+        function handleDragOver(event) { event.preventDefault(); event.stopPropagation(); event.target.closest('.upload-area').classList.add('dragover'); }
+        function handleDragLeave(event) { event.preventDefault(); event.stopPropagation(); event.target.closest('.upload-area').classList.remove('dragover'); }
+        
+        function loadReportFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    displayReport(data);
+                } catch (error) {
+                    alert('Error parsing JSON file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayReport(data) {
+            reportData = data;
+            document.getElementById('dashboardContent').style.display = 'block';
+            document.getElementById('dashboardGrid').style.display = 'block';
+            document.getElementById('frameworkCount').textContent = data.scan_summary?.frameworks_found || 0;
+            document.getElementById('dependencyCount').textContent = data.scan_summary?.dependencies_found || 0;
+            document.getElementById('scanDate').textContent = new Date(parseFloat(data.scan_summary?.scan_timestamp || Date.now())*1000).toLocaleDateString();
+            displayFrameworks(data.installed_frameworks || {});
+            displayApplicationDependencies(data.dependencies || {}, data.installed_frameworks || {});
+            createFrameworkChart(data.installed_frameworks || {});
+        }
+
+        function displayFrameworks(frameworks) {
+            const container = document.getElementById('frameworkList');
+            if (Object.keys(frameworks).length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #b0b0b0;">No installed frameworks found.</p>';
+                return;
+            }
+            container.innerHTML = Object.entries(frameworks).map(([name, info]) => `
+                <div class="framework-item">
+                    <div class="framework-info">
+                        <h4>${name}</h4>
+                        <p>Version: ${info.version || 'Unknown'} | Path: ${info.path || 'N/A'}</p>
+                    </div>
+                    <span class="status-badge status-${info.eol_status?.toLowerCase() || 'unknown'}">
+                        ${info.eol_status || 'Unknown'}
+                    </span>
+                </div>
+            `).join('');
+        }
+        
+        function displayApplicationDependencies(dependencies, frameworks) {
+            const container = document.getElementById('applicationDependencies');
+            const allDeps = Object.values(dependencies).flat();
+            if (allDeps.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #b0b0b0;">No running application dependencies found.</p>';
+                return;
+            }
+            const apps = allDeps.reduce((acc, dep) => {
+                acc[dep.app] = acc[dep.app] || [];
+                acc[dep.app].push(dep);
+                return acc;
+            }, {});
+
+            container.innerHTML = Object.entries(apps).map(([appName, appDeps]) => `
+                <h3 class="app-name">${appName}</h3>
+                ${appDeps.map(dep => {
+                    const frameworkName = dep.framework || 'Unknown';
+                    const frameworkInfo = frameworks[frameworkName] || Object.values(frameworks).find(f => frameworkName.includes(f.version));
+                    const isEol = frameworkInfo && frameworkInfo.eol_status === 'EOL';
+                    const isRunning = dep.status === 'running';
+                    const eolClass = isEol ? 'eol' : '';
+                    const runningClass = isRunning ? 'running' : '';
+                    
+                    return `
+                        <div class="app-dependency ${eolClass} ${runningClass}">
+                            <div class="app-header">
+                                <span class="dependency-framework ${eolClass}">${frameworkName}</span>
+                                <div>
+                                    ${isRunning ? '<span class="running-indicator">Running</span>' : ''}
+                                    <span class="confidence-badge confidence-${dep.confidence?.toLowerCase() || 'low'}">${dep.confidence || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div class="app-details">
+                                <div class="app-detail-item">
+                                    <strong>Application Path:</strong>
+                                    <span class="app-path">${dep.file}</span>
+                                </div>
+                                <div class="app-detail-item">
+                                    <strong>Method:</strong> ${dep.detection_method}
+                                    ${dep.pid ? `| <strong>PID:</strong> ${dep.pid}` : ''}
+                                </div>
+                                ${dep.dependency_path ? `
+                                <div class="app-detail-item full-row">
+                                    <strong>Dependency Location:</strong>
+                                    <span class="app-path">${dep.dependency_path}</span>
+                                </div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            `).join('');
+        }
+
+        function createFrameworkChart(frameworks) {
+            const ctx = document.getElementById('frameworkChart').getContext('2d');
+            if (frameworkChart) frameworkChart.destroy();
+            const counts = Object.values(frameworks).reduce((acc, f) => {
+                const status = f.eol_status || 'Unknown';
+                acc[status] = (acc[status] || 0) + 1;
+                return acc;
+            }, {});
+            frameworkChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['End of Life', 'Supported', 'Unknown'],
+                    datasets: [{
+                        data: [counts['EOL'] || 0, counts['Supported'] || 0, counts['Unknown'] || 0],
+                        backgroundColor: ['#e74c3c', '#27ae60', '#5f6769'],
+                        borderWidth: 0, hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true, color: '#f0f0f0' } } }
+                }
+            });
+        }
+
+        // --- NEW PDF EXPORT FUNCTION ---
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const reportElement = document.getElementById('reportContainer');
+            const pdfButton = document.getElementById('exportPdfBtn');
+
+            pdfButton.textContent = '📄 Generating...';
+            pdfButton.disabled = true;
+
+            // Hide file upload area for the screenshot
+            const uploadArea = document.getElementById('fileUploadContainer');
+            const originalDisplay = uploadArea.style.display;
+            uploadArea.style.display = 'none';
+
+            html2canvas(reportElement, { 
+                scale: 2, // Increase resolution for better quality
+                useCORS: true,
+                backgroundColor: '#1f2027' // Match body background
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const canvasAspectRatio = canvasWidth / canvasHeight;
+                const pageAspectRatio = pdfWidth / pdfHeight;
+                
+                let renderableHeight, renderableWidth, x, y;
+
+                if (canvasAspectRatio < pageAspectRatio) {
+                    renderableHeight = pdfHeight;
+                    renderableWidth = renderableHeight * canvasAspectRatio;
+                    x = (pdfWidth - renderableWidth) / 2;
+                    y = 0;
+                } else {
+                    renderableWidth = pdfWidth;
+                    renderableHeight = renderableWidth / canvasAspectRatio;
+                    x = 0;
+                    y = (pdfHeight - renderableHeight) / 2;
+                }
+                
+                // Add title page
+                pdf.setFontSize(22);
+                pdf.text("Assure Technical Dependency Report", pdfWidth / 2, 20, { align: 'center' });
+                pdf.setFontSize(12);
+                pdf.text(`Report generated on: ${new Date().toLocaleDateString()}`, pdfWidth / 2, 30, { align: 'center' });
+                
+                // Add the captured image on a new page
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, (canvasHeight * pdfWidth) / canvasWidth);
+
+                const fileName = `Dependency_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+                pdf.save(fileName);
+
+            }).finally(() => {
+                // Restore button and upload area
+                pdfButton.textContent = '📄 Export PDF Report';
+                pdfButton.disabled = false;
+                uploadArea.style.display = originalDisplay;
+            });
+        }
+
+        function exportToCSV() {
+            if (!reportData || !reportData.dependencies) {
+                alert('No dependency data to export.');
+                return;
+            }
+            
+            let csv = 'Application,PID,App Path,Framework,Dependency Path,EOL Status,Detection Method\n';
+            const allDeps = Object.values(reportData.dependencies).flat();
+
+            allDeps.forEach(dep => {
+                const frameworkInfo = reportData.installed_frameworks[dep.framework] || {};
+                const eolStatus = frameworkInfo.eol_status || 'Unknown';
+                const row = [
+                    `"${dep.app || ''}"`,
+                    `"${dep.pid || ''}"`,
+                    `"${dep.file || ''}"`,
+                    `"${dep.framework || ''}"`,
+                    `"${dep.dependency_path || ''}"`,
+                    `"${eolStatus}"`,
+                    `"${dep.detection_method || ''}"`
+                ].join(',');
+                csv += row + '\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'application_dependencies.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        window.addEventListener('load', () => {
+            const loadingIndicator = document.getElementById('loading');
+            loadingIndicator.style.display = 'block';
+
+            fetch('./dependency_report.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Report not found (HTTP ${response.status}). Please run the scan or load the file manually.`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('fileUploadContainer').style.display = 'none';
+                    displayReport(data);
+                })
+                .catch(error => {
+                    console.error('Auto-load failed:', error.message);
+                    document.getElementById('fileUploadContainer').style.display = 'block';
+                })
+                .finally(() => {
+                    loadingIndicator.style.display = 'none';
+                });
+        });
+    </script>
+</body>
+</html>
