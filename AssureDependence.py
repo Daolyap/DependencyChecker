@@ -101,17 +101,14 @@ class DependencyScanner:
         """Detects Microsoft SQL Server instances via registry and services."""
         sql_server_installs = {}
         try:
-            # Find instance names from the registry
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL") as key:
                 for i in range(winreg.QueryInfoKey(key)[1]):
                     name, inst_id, _ = winreg.EnumValue(key, i)
                     try:
-                        # Get version from the instance-specific key
                         ver_key_path = fr"SOFTWARE\Microsoft\Microsoft SQL Server\{inst_id}\MSSQLServer\CurrentVersion"
                         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, ver_key_path) as ver_key:
                             version, _ = winreg.QueryValueEx(ver_key, "CurrentVersion")
                         
-                        # Get path from the instance-specific key
                         path_key_path = fr"SOFTWARE\Microsoft\Microsoft SQL Server\{inst_id}\Setup"
                         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path_key_path) as path_key:
                             path, _ = winreg.QueryValueEx(path_key, "SQLDataRoot")
@@ -171,7 +168,7 @@ class DependencyScanner:
     
     def scan_installed_applications(self):
         """Scan installed applications for framework dependencies"""
-        print("🔍 Scanning installed applications for .NET Core and Java...")
+        print("🔍 Scanning installed applications for Java JARs...")
         program_dirs = [Path("C:/Program Files"), Path("C:/Program Files (x86)"), Path("C:/ProgramData")]
         for prog_dir in program_dirs:
             if prog_dir.exists():
@@ -188,7 +185,7 @@ class DependencyScanner:
         except (PermissionError, OSError): pass
     
     def analyze_file_dependencies(self, file_path):
-        """Analyze individual file for .NET Core or Java dependencies"""
+        """Analyze individual file for Java dependencies"""
         try:
             app_name = self.get_application_name(file_path)
             self.dependencies['java'].append({
@@ -283,19 +280,24 @@ class DependencyScanner:
         except: return 'Unknown'
 
     def check_dotnet_core_eol(self, v):
-        eol_versions = ['1.0', '1.1', '2.0', '2.1', '2.2', '3.0', '3.1', '5.0', '6.0' '7.0']
+        """Checks if a .NET Core version is End of Life."""
+        # This list contains all major versions that are now End of Life.
+        # .NET 6 (LTS) EOL: Nov 2024. .NET 7 (STS) EOL: May 2024.
+        # .NET 8 is the current oldest supported LTS version.
+        eol_versions = ['1.0', '1.1', '2.0', '2.1', '2.2', '3.0', '3.1', '5.0', '6.0', '7.0']
         return 'EOL' if any(v.startswith(p) for p in eol_versions) else 'Supported'
         
     def check_mssql_eol(self, v):
         try:
             major_version = int(v.split('.')[0])
-            # 13=2016, 14=2017, 15=2019, 16=2022. Anything < 2016 is EOL.
+            # SQL Server versions by major version number:
+            # 13=2016, 14=2017, 15=2019, 16=2022. Anything < 2016 is generally EOL.
             return 'EOL' if major_version < 13 else 'Supported'
         except: return 'Unknown'
         
     def check_mysql_eol(self, v):
         try:
-            # MySQL versions before 8.0 are EOL.
+            # MySQL versions before 8.0 are officially EOL.
             return 'EOL' if v.startswith('5.') else 'Supported'
         except: return 'Unknown'
         
