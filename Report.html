@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assure Technical Dependency Dashboard</title>
+    <title>AT Dependency Dashboard</title>
     <!-- ADDED LIBRARIES FOR PDF EXPORT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -112,7 +112,7 @@
         <!-- The ID "reportContainer" wraps everything that will be included in the PDF -->
         <div id="reportContainer">
             <div class="header">
-                <h1>💻 Assure Technical Application Dependency Dashboard</h1>
+                <h1>💻 AT Application Dependency Dashboard</h1>
                 <p>An overview of installed frameworks and their application dependencies</p>
                 
                 <div class="file-upload" id="fileUploadContainer">
@@ -333,7 +333,7 @@
                 
                 // Add title page
                 pdf.setFontSize(22);
-                pdf.text("Assure Technical Dependency Report", pdfWidth / 2, 20, { align: 'center' });
+                pdf.text("AT Dependency Report", pdfWidth / 2, 20, { align: 'center' });
                 pdf.setFontSize(12);
                 pdf.text(`Report generated on: ${new Date().toLocaleDateString()}`, pdfWidth / 2, 30, { align: 'center' });
                 
